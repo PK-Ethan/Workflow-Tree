@@ -1,0 +1,2111 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workflow Skill Tree</title>
+
+  <style>
+    /* =====================================================
+       1. Zmienne i reset
+       ===================================================== */
+
+    :root {
+      --bg: #0f172a;
+      --text: #ffffff;
+      --muted: #e3e3e3;
+      --ready: #2563eb;
+      --done: #16a34a;
+      --locked: #374151;
+      --danger: #dc2626;
+      --warning: #f59e0b;
+      --shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0, var(--bg) 45%, #020617 100%);
+      color: var(--text);
+      overflow: hidden;
+      font-size: 12px;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    /* =====================================================
+       2. Header i przyciski
+       ===================================================== */
+
+    header {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+      background: rgba(15, 23, 42, 0.84);
+      backdrop-filter: blur(14px);
+      position: relative;
+      z-index: 5;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0.2px;
+    }
+
+    header p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .zoom-badge {
+      min-width: 52px;
+      text-align: center;
+      color: #cbd5e1;
+      background: rgba(148, 163, 184, 0.14);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 10px;
+      padding: 7px 8px;
+      font-size: 11px;
+    }
+
+    button {
+      border: 0;
+      color: white;
+      background: #334155;
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease;
+      font-size: 12px;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: #475569;
+    }
+
+    button.primary {
+      background: var(--ready);
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    button.ghost {
+      background: rgba(148, 163, 184, 0.16);
+    }
+
+    button.active {
+      background: var(--warning);
+      color: #111827;
+      font-weight: 800;
+    }
+
+    /* =====================================================
+       3. Layout i panel boczny
+       ===================================================== */
+
+    main {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      height: calc(100vh - 64px);
+    }
+
+    aside {
+      border-right: 1px solid rgba(148, 163, 184, 0.18);
+      background: rgba(17, 24, 39, 0.72);
+      backdrop-filter: blur(14px);
+      padding: 8px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .card {
+      background: rgba(31, 41, 55, 0.88);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: var(--shadow);
+      border-radius: 14px;
+      padding: 9px;
+      margin-bottom: 8px;
+    }
+
+    .card h2 {
+      margin: 0 0 7px;
+      font-size: 12px;
+    }
+
+    label {
+      display: block;
+      margin: 6px 0 3px;
+      color: #e6e8ed;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      background: rgba(15, 23, 42, 0.72);
+      color: var(--text);
+      border-radius: 9px;
+      padding: 6px 7px;
+      outline: none;
+      font-size: 11px;
+    }
+
+    input[type="color"] {
+      height: 30px;
+      padding: 3px;
+      cursor: pointer;
+    }
+
+    textarea {
+      min-height: 34px;
+      resize: vertical;
+    }
+
+    .compact-grid {
+      display: grid;
+      grid-template-columns: 1fr 40px;
+      gap: 6px;
+      align-items: end;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .stat {
+      padding: 7px;
+      border-radius: 11px;
+      background: rgba(15, 23, 42, 0.62);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 16px;
+    }
+
+    .stat span,
+    .legend,
+    .edit-note {
+      color: var(--muted);
+    }
+
+    .stat span {
+      font-size: 9px;
+    }
+
+    .legend {
+      display: grid;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    .dot.ready { background: var(--ready); }
+    .dot.done { background: var(--done); }
+    .dot.locked { background: var(--locked); }
+
+    .edit-note {
+      font-size: 10px;
+      line-height: 1.3;
+      margin-top: 7px;
+    }
+
+    /* =====================================================
+       4. Płótno, warstwy SVG, linki i tła gałęzi
+       ===================================================== */
+
+    #workspace {
+      position: relative;
+      overflow: auto;
+      cursor: default;
+      overscroll-behavior: contain;
+      background-image: radial-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+
+    #canvasSizer {
+      position: relative;
+      width: 3000px;
+      height: 1800px;
+      min-width: 3000px;
+      min-height: 1800px;
+    }
+
+    #canvas {
+      position: relative;
+      width: 3000px;
+      height: 1800px;
+      min-width: 3000px;
+      min-height: 1800px;
+      padding: 70px;
+      transform-origin: 0 0;
+    }
+
+    svg.layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .branch-backgrounds { z-index: 0; }
+    .links { z-index: 1; }
+    .link-draft { z-index: 3; }
+
+    .branch-bg-rect {
+      rx: 34;
+      ry: 34;
+      stroke-width: 2;
+      stroke-dasharray: 10 8;
+    }
+
+    .draft-link-path {
+      fill: none;
+      stroke: var(--warning);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-dasharray: 12 8;
+      opacity: 0.95;
+    }
+
+    /* =====================================================
+       5. Kafelki
+       ===================================================== */
+
+    .node {
+      --node-color: #2563eb;
+      position: absolute;
+      z-index: 2;
+      width: 220px;
+      min-height: 126px;
+      border-radius: 22px;
+      padding: 14px;
+      background:
+        radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--node-color) 70%, white 5%) 0%, color-mix(in srgb, var(--node-color) 58%, transparent) 18%, color-mix(in srgb, var(--node-color) 20%, transparent) 42%, rgba(15, 23, 42, 0) 72%),
+        linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.96));
+      border: 1px solid color-mix(in srgb, var(--node-color) 78%, rgba(148, 163, 184, 0.25));
+      box-shadow: var(--shadow), 0 0 22px color-mix(in srgb, var(--node-color) 22%, transparent);
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+      overflow: hidden;
+    }
+
+    .node::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background:
+        radial-gradient(circle at 8% 6%, rgba(255, 255, 255, 0.18), transparent 19%),
+        linear-gradient(135deg, color-mix(in srgb, var(--node-color) 48%, white 8%) 0%, color-mix(in srgb, var(--node-color) 18%, transparent) 38%, rgba(255, 255, 255, 0) 68%);
+      opacity: 0.22;
+      pointer-events: none;
+    }
+
+    .node > * {
+      position: relative;
+    }
+
+    .node:hover {
+      transform: translateY(-2px);
+    }
+
+    .node.dragging {
+      cursor: grabbing;
+      transform: scale(1.015);
+      z-index: 4;
+    }
+
+    .node.locked {
+      filter: grayscale(0.45);
+      opacity: 0.72;
+      border-color: rgba(148, 163, 184, 0.18);
+    }
+
+    .node.done {
+      border-color: var(--done);
+    }
+
+    .node.selected {
+      outline: 3px solid rgba(245, 158, 11, 0.72);
+    }
+
+    .node.link-source {
+      outline: 4px solid rgba(245, 158, 11, 0.95);
+    }
+
+    .node.root {
+      width: 300px;
+      min-height: 188px;
+      padding: 18px;
+      border-radius: 28px;
+    }
+
+    .node.root h3 {
+      font-size: 18px;
+    }
+
+    .node-top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .node h3 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.25;
+    }
+
+    .node p {
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(148, 163, 184, 0.18);
+      color: #cbd5e1;
+    }
+
+    .badge.ready { background: rgba(37, 99, 235, 0.22); color: #bfdbfe; }
+    .badge.done { background: rgba(22, 163, 74, 0.22); color: #bbf7d0; }
+    .badge.locked { background: rgba(107, 114, 128, 0.20); color: #d1d5db; }
+    .badge.root-badge { background: rgba(245, 158, 11, 0.20); color: #fde68a; }
+
+    .node-footer {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .hint {
+      color: #cbd5e1;
+      font-size: 12px;
+    }
+
+    .mini-toggle {
+      width: 34px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border-radius: 10px;
+      background: rgba(148, 163, 184, 0.16);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      font-weight: 900;
+    }
+
+    .node.done .mini-toggle {
+      background: var(--done);
+      border-color: var(--done);
+      color: white;
+    }
+
+    .root-progress {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(2, 6, 23, 0.42);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    .root-progress-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: #dbeafe;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .progress-bar {
+      margin-top: 8px;
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.22);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--node-color), #22c55e);
+    }
+
+    .root-progress-meta {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+    }
+
+    /* =====================================================
+       6. Szczegóły i toast
+       ===================================================== */
+
+    .details small {
+      color: var(--muted);
+      display: block;
+      margin-top: 6px;
+      line-height: 1.35;
+      font-size: 10px;
+    }
+
+    .parent-list {
+      display: grid;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .parent-chip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 5px 6px;
+      background: rgba(15, 23, 42, 0.58);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 8px;
+      font-size: 10px;
+    }
+
+    .parent-chip button {
+      padding: 3px 6px;
+      border-radius: 7px;
+      font-size: 10px;
+      background: rgba(220, 38, 38, 0.85);
+    }
+
+    .actions {
+      display: grid;
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    #detailsCard {
+      display: none;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 16px;
+      padding: 12px 14px;
+      color: #e5e7eb;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>Workflow Skill Tree</h1>
+      <p>Drzewko etapów z wieloma zależnościami, tłem gałęzi i łączeniem kafelków myszką</p>
+    </div>
+
+    <div class="toolbar">
+      <span class="zoom-badge" id="zoomBadge">100%</span>
+      <button class="ghost" id="resetZoomBtn">Zoom 100%</button>
+      <button class="ghost" id="linkModeBtn">Łączenie: wył.</button>
+      <button class="ghost" id="exportBtn">Eksport JSON</button>
+      <button class="ghost" id="importBtn">Import JSON</button>
+      <button class="danger" id="resetBtn">Reset demo</button>
+      <input id="importFile" type="file" accept="application/json" style="display:none" />
+    </div>
+  </header>
+
+  <main>
+    <aside>
+      <section class="card">
+        <h2>Postęp globalny</h2>
+        <div class="stats">
+          <div class="stat"><strong id="doneCount">0</strong><span>ukończone</span></div>
+          <div class="stat"><strong id="readyCount">0</strong><span>dostępne</span></div>
+          <div class="stat"><strong id="lockedCount">0</strong><span>zablokowane</span></div>
+          <div class="stat"><strong id="percentDone">0%</strong><span>całości</span></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Dodaj etap</h2>
+        <div class="compact-grid">
+          <div>
+            <label for="taskTitle">Nazwa</label>
+            <input id="taskTitle" placeholder="np. Testy UAT" />
+          </div>
+          <div>
+            <label for="taskColor">Kolor</label>
+            <input id="taskColor" type="color" value="#2563eb" />
+          </div>
+        </div>
+
+        <label for="taskDesc">Opis</label>
+        <textarea id="taskDesc" placeholder="Krótki opis"></textarea>
+
+        <button class="primary" style="width:100%; margin-top:8px" id="addTaskBtn">Dodaj</button>
+      </section>
+
+      <section class="card details" id="detailsCard">
+        <h2>Szczegóły i edycja</h2>
+        <div id="detailsBox"></div>
+      </section>
+
+    </aside>
+
+    <section id="workspace">
+      <div id="canvasSizer">
+        <div id="canvas">
+          <svg class="layer branch-backgrounds" id="branchBackgrounds"></svg>
+          <svg class="layer links" id="links"></svg>
+          <svg class="layer link-draft" id="linkDraft"></svg>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // =====================================================
+    // 1. Konfiguracja
+    // =====================================================
+
+    const STORAGE_KEY = 'workflow-skill-tree-readable-v1';
+    const DEFAULT_COLOR = '#2563eb';
+
+    const NODE = {
+      normalWidth: 220,
+      rootWidth: 300,
+      normalCenterY: 63,
+      rootCenterY: 94,
+      normalEstimatedHeight: 170,
+      rootEstimatedHeight: 240
+    };
+
+    const CANVAS = {
+      initialWidth: 3000,
+      initialHeight: 1800,
+      expandMargin: 420,
+      expandStep: 900
+    };
+
+    const ZOOM = {
+      min: 0.35,
+      max: 1.8,
+      step: 0.08
+    };
+
+    // =====================================================
+    // 2. Stan aplikacji
+    // =====================================================
+
+    let appState = {
+      selectedTaskId: null,
+      zoom: 1,
+      linkMode: false,
+      activeDrag: null,
+      activeLink: null,
+      canvasWidth: CANVAS.initialWidth,
+      canvasHeight: CANVAS.initialHeight,
+      tasks: []
+    };
+
+    const elements = {
+      workspace: document.getElementById('workspace'),
+      canvasSizer: document.getElementById('canvasSizer'),
+      canvas: document.getElementById('canvas'),
+      branchBackgrounds: document.getElementById('branchBackgrounds'),
+      links: document.getElementById('links'),
+      linkDraft: document.getElementById('linkDraft'),
+      zoomBadge: document.getElementById('zoomBadge'),
+      linkModeBtn: document.getElementById('linkModeBtn'),
+      detailsCard: document.getElementById('detailsCard'),
+      detailsBox: document.getElementById('detailsBox'),
+      taskTitle: document.getElementById('taskTitle'),
+      taskDesc: document.getElementById('taskDesc'),
+      taskColor: document.getElementById('taskColor'),
+      importFile: document.getElementById('importFile'),
+      toast: document.getElementById('toast')
+    };
+
+    let panState = {
+      isPanning: false,
+      startX: 0,
+      startY: 0,
+      scrollLeft: 0,
+      scrollTop: 0
+    };
+
+    // =====================================================
+    // 3. Dane demo i normalizacja
+    // =====================================================
+
+    function getDemoTasks() {
+      return [
+        {
+          id: 'start',
+          isStart: true,
+          title: 'Start procesu',
+          desc: 'Wdrożenie przykładowego procesu od analizy do go-live.',
+          parentIds: [],
+          done: false,
+          color: '#14b8a6',
+          x: 70,
+          y: 310
+        },
+        {
+          id: 'analysis',
+          title: 'Analiza wymagań',
+          desc: 'Zebranie potrzeb, ryzyk i wymagań biznesowych.',
+          parentIds: ['start'],
+          done: false,
+          color: '#2563eb',
+          branchColor: '#2563eb',
+          x: 430,
+          y: 140
+        },
+        {
+          id: 'approval',
+          title: 'Akceptacja biznesowa',
+          desc: 'Potwierdzenie zakresu przez właściciela procesu.',
+          parentIds: ['analysis'],
+          done: false,
+          color: '#8b5cf6',
+          x: 720,
+          y: 140
+        },
+        {
+          id: 'config',
+          title: 'Konfiguracja',
+          desc: 'Ustawienie parametrów, kont, dostępów lub integracji.',
+          parentIds: ['approval'],
+          done: false,
+          color: '#f59e0b',
+          x: 1010,
+          y: 140
+        },
+        {
+          id: 'tests',
+          title: 'Testy',
+          desc: 'Sprawdzenie scenariuszy pozytywnych i negatywnych.',
+          parentIds: ['config'],
+          done: false,
+          color: '#ef4444',
+          x: 1300,
+          y: 140
+        },
+        {
+          id: 'docs',
+          title: 'Dokumentacja',
+          desc: 'Opis procesu, instrukcje i kryteria odbioru.',
+          parentIds: ['analysis'],
+          done: false,
+          color: '#06b6d4',
+          x: 720,
+          y: 400
+        },
+        {
+          id: 'training',
+          title: 'Przekazanie wiedzy',
+          desc: 'Omówienie procesu z zespołem operacyjnym.',
+          parentIds: ['docs'],
+          done: false,
+          color: '#84cc16',
+          x: 1010,
+          y: 400
+        },
+        {
+          id: 'golive',
+          title: 'Go-live',
+          desc: 'Uruchomienie procesu i monitoring pierwszych przypadków.',
+          parentIds: ['tests'],
+          done: false,
+          color: '#22c55e',
+          x: 1300,
+          y: 400
+        }
+      ];
+    }
+
+    function normalizeParentIds(task) {
+      if (Array.isArray(task.parentIds)) {
+        return [...new Set(task.parentIds.filter(Boolean))];
+      }
+
+      // Kompatybilność ze starszym formatem danych.
+      if (task.parentId) {
+        return [task.parentId];
+      }
+
+      return [];
+    }
+
+    function normalizeTasks(rawTasks) {
+      if (!Array.isArray(rawTasks)) {
+        return getDemoTasks();
+      }
+
+      return rawTasks.map((task, index) => {
+        const parentIds = normalizeParentIds(task);
+
+        return {
+          id: task.id || `task-${Date.now()}-${index}`,
+          isStart: Boolean(task.isStart) || task.id === 'start',
+          title: task.title || 'Nowy etap',
+          desc: task.desc || '',
+          parentIds: parentIds,
+          done: parentIds.length ? Boolean(task.done) : false,
+          color: task.color || DEFAULT_COLOR,
+          branchColor: task.branchColor || null,
+          x: clamp(Number.isFinite(task.x) ? task.x : 80 + index * 30, 20, appState.canvasWidth - 360),
+          y: clamp(Number.isFinite(task.y) ? task.y : 80 + index * 30, 20, appState.canvasHeight - 260)
+        };
+      });
+    }
+
+    function loadTasks() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+
+        if (saved) {
+          return normalizeTasks(JSON.parse(saved));
+        }
+      } catch (error) {
+        console.warn('Nie udało się odczytać danych:', error);
+      }
+
+      return getDemoTasks();
+    }
+
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState.tasks));
+    }
+
+    // =====================================================
+    // 4. Funkcje pomocnicze
+    // =====================================================
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function findTaskById(taskId) {
+      return appState.tasks.find(task => task.id === taskId);
+    }
+
+    function isStartTask(task) {
+      return Boolean(task && task.isStart);
+    }
+
+    function getParents(task) {
+      const parentIds = task.parentIds || [];
+
+      return parentIds
+        .map(parentId => findTaskById(parentId))
+        .filter(parent => Boolean(parent));
+    }
+
+    function getChildren(parentId) {
+      return appState.tasks.filter(task => (task.parentIds || []).includes(parentId));
+    }
+
+    function getNodeWidth(task) {
+      return isStartTask(task) ? NODE.rootWidth : NODE.normalWidth;
+    }
+
+    function getNodeCenterY(task) {
+      return isStartTask(task) ? NODE.rootCenterY : NODE.normalCenterY;
+    }
+
+    function getNodeEstimatedHeight(task) {
+      return isStartTask(task) ? NODE.rootEstimatedHeight : NODE.normalEstimatedHeight;
+    }
+
+    function createSvgElement(tagName) {
+      return document.createElementNS('http://www.w3.org/2000/svg', tagName);
+    }
+
+    function hexToRgb(hex) {
+      const normalized = String(hex || DEFAULT_COLOR).replace('#', '').trim();
+      const fullHex = normalized.length === 3
+        ? normalized.split('').map(char => char + char).join('')
+        : normalized.padEnd(6, '0').slice(0, 6);
+
+      const number = parseInt(fullHex, 16);
+
+      return {
+        r: (number >> 16) & 255,
+        g: (number >> 8) & 255,
+        b: number & 255
+      };
+    }
+
+    function rgbaFromHex(hex, alpha) {
+      const rgb = hexToRgb(hex);
+      return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+    }
+
+    // =====================================================
+    // 5. Logika zależności i gałęzi
+    // =====================================================
+
+    function isReady(task) {
+      if (isStartTask(task)) {
+        return true;
+      }
+
+      if (task.done) {
+        return false;
+      }
+
+      const parents = getParents(task);
+
+      // Kafelek bez zależności jest dostępny.
+      if (parents.length === 0) {
+        return true;
+      }
+
+      // Przy wielu zależnościach wszystkie poprzednie etapy muszą być ukończone.
+      return parents.every(parent => isStartTask(parent) || parent.done);
+    }
+
+    function isLocked(task) {
+      return !isStartTask(task) && !task.done && !isReady(task);
+    }
+
+    function getStatus(task) {
+      if (isStartTask(task)) {
+        return 'ready';
+      }
+
+      if (task.done) {
+        return 'done';
+      }
+
+      if (isReady(task)) {
+        return 'ready';
+      }
+
+      return 'locked';
+    }
+
+    function getStatusLabel(task) {
+      if (isStartTask(task)) {
+        return 'Start';
+      }
+
+      const status = getStatus(task);
+
+      if (status === 'done') return 'Zrobione';
+      if (status === 'ready') return 'Dostępne';
+      return 'Zablokowane';
+    }
+
+    function getDescendantTasks(parentId, visitedIds = new Set()) {
+      const descendants = [];
+
+      for (const child of getChildren(parentId)) {
+        if (visitedIds.has(child.id)) {
+          continue;
+        }
+
+        visitedIds.add(child.id);
+        descendants.push(child);
+        descendants.push(...getDescendantTasks(child.id, visitedIds));
+      }
+
+      return descendants;
+    }
+
+    function getTreeProgress(startTaskId) {
+      const descendants = getDescendantTasks(startTaskId).filter(task => !isStartTask(task));
+      const total = descendants.length;
+      const done = descendants.filter(task => task.done).length;
+      const ready = descendants.filter(task => isReady(task)).length;
+      const locked = descendants.filter(task => isLocked(task)).length;
+
+      return {
+        total,
+        done,
+        ready,
+        locked,
+        percent: total ? Math.round((done / total) * 100) : 0
+      };
+    }
+
+    function getBranchRoot(task) {
+      if (!task || isStartTask(task)) {
+        return null;
+      }
+
+      // Jeśli którykolwiek rodzic jest Startem, to ten kafelek jest początkiem gałęzi.
+      const hasStartParent = (task.parentIds || []).some(parentId => {
+        const parent = findTaskById(parentId);
+        return parent && isStartTask(parent);
+      });
+
+      if (hasStartParent) {
+        return task;
+      }
+
+      // Przy wielu rodzicach wybieramy pierwszą ścieżkę do ustalenia głównej gałęzi wizualnej.
+      const firstParent = getParents(task)[0];
+      return firstParent ? getBranchRoot(firstParent) : null;
+    }
+
+    function isBranchRoot(task) {
+      if (!task || isStartTask(task)) {
+        return false;
+      }
+
+      return (task.parentIds || []).some(parentId => {
+        const parent = findTaskById(parentId);
+        return parent && isStartTask(parent);
+      });
+    }
+
+    function getBranchGroups() {
+      const groups = [];
+      const startTasks = appState.tasks.filter(task => isStartTask(task));
+
+      for (const startTask of startTasks) {
+        const directChildren = getChildren(startTask.id);
+
+        for (const child of directChildren) {
+          groups.push({
+            startTask,
+            branchRoot: child,
+            nodes: [startTask, child, ...getDescendantTasks(child.id)]
+          });
+        }
+      }
+
+      return groups;
+    }
+
+    function setBranchColor(branchRootTask, color) {
+      if (!branchRootTask) return;
+      branchRootTask.branchColor = color || branchRootTask.color || DEFAULT_COLOR;
+    }
+
+    // =====================================================
+    // 6. Płótno i zoom
+    // =====================================================
+
+    function applyCanvasSize() {
+      elements.canvas.style.width = `${appState.canvasWidth}px`;
+      elements.canvas.style.height = `${appState.canvasHeight}px`;
+      elements.canvas.style.minWidth = `${appState.canvasWidth}px`;
+      elements.canvas.style.minHeight = `${appState.canvasHeight}px`;
+
+      elements.canvasSizer.style.width = `${appState.canvasWidth * appState.zoom}px`;
+      elements.canvasSizer.style.height = `${appState.canvasHeight * appState.zoom}px`;
+      elements.canvasSizer.style.minWidth = `${appState.canvasWidth * appState.zoom}px`;
+      elements.canvasSizer.style.minHeight = `${appState.canvasHeight * appState.zoom}px`;
+
+      const viewBox = `0 0 ${appState.canvasWidth} ${appState.canvasHeight}`;
+      elements.links.setAttribute('viewBox', viewBox);
+      elements.branchBackgrounds.setAttribute('viewBox', viewBox);
+      elements.linkDraft.setAttribute('viewBox', viewBox);
+    }
+
+    function ensureCanvasForRect(x, y, width, height) {
+      let expanded = false;
+
+      while (x + width + CANVAS.expandMargin > appState.canvasWidth) {
+        appState.canvasWidth += CANVAS.expandStep;
+        expanded = true;
+      }
+
+      while (y + height + CANVAS.expandMargin > appState.canvasHeight) {
+        appState.canvasHeight += CANVAS.expandStep;
+        expanded = true;
+      }
+
+      if (expanded) {
+        applyCanvasSize();
+        showToast('Płótno zostało powiększone.');
+      }
+    }
+
+    function clientToCanvas(clientX, clientY) {
+      const rect = elements.workspace.getBoundingClientRect();
+
+      return {
+        x: (elements.workspace.scrollLeft + clientX - rect.left) / appState.zoom,
+        y: (elements.workspace.scrollTop + clientY - rect.top) / appState.zoom
+      };
+    }
+
+    function applyZoom(newZoom, anchorClientX, anchorClientY) {
+      const oldZoom = appState.zoom;
+      appState.zoom = clamp(newZoom, ZOOM.min, ZOOM.max);
+
+      if (appState.zoom === oldZoom) {
+        return;
+      }
+
+      const rect = elements.workspace.getBoundingClientRect();
+      const anchorX = anchorClientX - rect.left;
+      const anchorY = anchorClientY - rect.top;
+
+      const worldX = (elements.workspace.scrollLeft + anchorX) / oldZoom;
+      const worldY = (elements.workspace.scrollTop + anchorY) / oldZoom;
+
+      elements.canvas.style.transform = `scale(${appState.zoom})`;
+      applyCanvasSize();
+
+      elements.workspace.scrollLeft = worldX * appState.zoom - anchorX;
+      elements.workspace.scrollTop = worldY * appState.zoom - anchorY;
+      elements.zoomBadge.textContent = `${Math.round(appState.zoom * 100)}%`;
+    }
+
+    function resetZoom() {
+      appState.zoom = 1;
+      elements.canvas.style.transform = 'scale(1)';
+      applyCanvasSize();
+      elements.zoomBadge.textContent = '100%';
+    }
+
+    // =====================================================
+    // 7. Renderowanie
+    // =====================================================
+
+    function render() {
+      applyCanvasSize();
+      renderNodes();
+      renderBranchBackgrounds();
+      renderLinks();
+      renderStats();
+      renderDetails();
+      saveTasks();
+    }
+
+    function renderNodes() {
+      elements.canvas.querySelectorAll('.node').forEach(node => node.remove());
+
+      for (const task of appState.tasks) {
+        const node = createTaskNode(task);
+        elements.canvas.appendChild(node);
+      }
+    }
+
+    function createTaskNode(task) {
+      const node = document.createElement('div');
+      const status = getStatus(task);
+
+      node.className = [
+        'node',
+        status,
+        isStartTask(task) ? 'root' : '',
+        appState.selectedTaskId === task.id ? 'selected' : ''
+      ].filter(Boolean).join(' ');
+
+      node.style.left = `${task.x}px`;
+      node.style.top = `${task.y}px`;
+      node.style.setProperty('--node-color', task.color || DEFAULT_COLOR);
+      node.dataset.id = task.id;
+
+      node.appendChild(createNodeHeader(task, status));
+      node.appendChild(createNodeDescription(task));
+
+      if (isStartTask(task)) {
+        node.appendChild(createRootProgress(task));
+      } else {
+        node.appendChild(createNodeFooter(task));
+      }
+
+      node.addEventListener('pointerdown', handleNodePointerDown);
+      return node;
+    }
+
+    function createNodeHeader(task, status) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'node-top';
+
+      const title = document.createElement('h3');
+      title.textContent = task.title;
+
+      const badge = document.createElement('span');
+      badge.className = `badge ${isStartTask(task) ? 'root-badge' : status}`;
+      badge.textContent = getStatusLabel(task);
+
+      wrapper.appendChild(title);
+      wrapper.appendChild(badge);
+      return wrapper;
+    }
+
+    function createNodeDescription(task) {
+      const description = document.createElement('p');
+      description.textContent = task.desc || 'Brak opisu';
+      return description;
+    }
+
+    function createNodeFooter(task) {
+      const footer = document.createElement('div');
+      footer.className = 'node-footer';
+
+      const hint = document.createElement('span');
+      hint.className = 'hint';
+      hint.textContent = 'Przeciągnij lub kliknij';
+
+      const toggle = document.createElement('button');
+      toggle.className = 'mini-toggle';
+      toggle.title = 'Odhacz lub cofnij';
+      toggle.textContent = task.done ? '✓' : '';
+      toggle.addEventListener('click', event => {
+        event.stopPropagation();
+        toggleTask(task.id);
+      });
+
+      footer.appendChild(hint);
+      footer.appendChild(toggle);
+      return footer;
+    }
+
+    function createRootProgress(task) {
+      const progress = getTreeProgress(task.id);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'root-progress';
+
+      wrapper.innerHTML = `
+        <div class="root-progress-row">
+          <span>Postęp drzewka</span>
+          <span>${progress.percent}%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${progress.percent}%"></div>
+        </div>
+        <div class="root-progress-meta">
+          <span>Ukończone: ${progress.done}/${progress.total}</span>
+          <span>Dostępne: ${progress.ready}</span>
+          <span>Zablokowane: ${progress.locked}</span>
+          <span>Etapy: ${progress.total}</span>
+        </div>
+      `;
+
+      return wrapper;
+    }
+
+    function renderBranchBackgrounds() {
+      elements.branchBackgrounds.innerHTML = '';
+
+      for (const group of getBranchGroups()) {
+        const bounds = getGroupBounds(group.nodes);
+        const color = group.branchRoot.branchColor || group.branchRoot.color || DEFAULT_COLOR;
+
+        const rect = createSvgElement('rect');
+        rect.setAttribute('class', 'branch-bg-rect');
+        rect.setAttribute('x', bounds.x);
+        rect.setAttribute('y', bounds.y);
+        rect.setAttribute('width', bounds.width);
+        rect.setAttribute('height', bounds.height);
+        rect.setAttribute('fill', rgbaFromHex(color, 0.12));
+        rect.setAttribute('stroke', rgbaFromHex(color, 0.36));
+
+        elements.branchBackgrounds.appendChild(rect);
+      }
+    }
+
+    function getGroupBounds(tasksInGroup) {
+      const paddingX = 46;
+      const paddingY = 42;
+
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      for (const task of tasksInGroup) {
+        minX = Math.min(minX, task.x);
+        minY = Math.min(minY, task.y);
+        maxX = Math.max(maxX, task.x + getNodeWidth(task));
+        maxY = Math.max(maxY, task.y + getNodeEstimatedHeight(task));
+      }
+
+      return {
+        x: Math.max(14, minX - paddingX),
+        y: Math.max(14, minY - paddingY),
+        width: maxX - minX + paddingX * 2,
+        height: maxY - minY + paddingY * 2
+      };
+    }
+
+    function renderLinks() {
+      elements.links.innerHTML = '';
+
+      for (const task of appState.tasks) {
+        for (const parentId of task.parentIds || []) {
+          const parent = findTaskById(parentId);
+
+          if (!parent) {
+            continue;
+          }
+
+          const path = createLinkPath(parent, task);
+          elements.links.appendChild(path);
+        }
+      }
+    }
+
+    function createLinkPath(parent, child) {
+      const x1 = parent.x + getNodeWidth(parent);
+      const y1 = parent.y + getNodeCenterY(parent);
+      const x2 = child.x;
+      const y2 = child.y + getNodeCenterY(child);
+      const mid = (x1 + x2) / 2;
+
+      const path = createSvgElement('path');
+      path.setAttribute('d', `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-width', '4');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke', isStartTask(parent) || parent.done ? '#16a34a' : parent.color || '#475569');
+      path.setAttribute('opacity', isStartTask(parent) || parent.done ? '0.92' : '0.56');
+
+      return path;
+    }
+
+    function renderStats() {
+      const relevantTasks = appState.tasks.filter(task => !isStartTask(task));
+      const total = relevantTasks.length || 1;
+      const done = relevantTasks.filter(task => task.done).length;
+      const ready = relevantTasks.filter(task => isReady(task)).length;
+      const locked = relevantTasks.filter(task => isLocked(task)).length;
+
+      document.getElementById('doneCount').textContent = done;
+      document.getElementById('readyCount').textContent = ready;
+      document.getElementById('lockedCount').textContent = locked;
+      document.getElementById('percentDone').textContent = `${Math.round((done / total) * 100)}%`;
+    }
+
+    // =====================================================
+    // 8. Panel szczegółów
+    // =====================================================
+
+    function renderDetails() {
+      const task = findTaskById(appState.selectedTaskId);
+
+      if (!task) {
+        elements.detailsCard.style.display = 'none';
+        elements.detailsBox.innerHTML = '';
+        return;
+      }
+
+      elements.detailsCard.style.display = 'block';
+      elements.detailsBox.innerHTML = '';
+
+      appendTaskSummary(task);
+
+      if (isStartTask(task)) {
+        appendStartTaskBranchColorControls(task);
+      }
+
+      if (!isStartTask(task)) {
+        appendParentList(task);
+      }
+
+      appendTaskEditFields(task);
+      appendTaskActions(task);
+    }
+
+    function appendTaskSummary(task) {
+      const parents = getParents(task);
+      const children = getChildren(task.id);
+
+      appendSmallText(`Status: ${getStatusLabel(task)}`);
+      appendSmallText(`Poprzednie etapy: ${parents.length ? parents.map(parent => parent.title).join(', ') : 'brak'}`);
+      appendSmallText(`Kolejne: ${children.length ? children.map(child => child.title).join(', ') : 'brak'}`);
+
+      if (isStartTask(task)) {
+        const progress = getTreeProgress(task.id);
+        appendSmallText(`Postęp drzewka: ${progress.done}/${progress.total}, ${progress.percent}%`);
+      }
+    }
+
+    function appendSmallText(text) {
+      const element = document.createElement('small');
+      element.textContent = text;
+      elements.detailsBox.appendChild(element);
+    }
+
+    function appendStartTaskBranchColorControls(startTask) {
+      const branchRoots = getChildren(startTask.id);
+
+      if (!branchRoots.length) {
+        return;
+      }
+
+      appendSmallText('Kolory tła gałęzi:');
+
+      for (const branchRoot of branchRoots) {
+        const inputId = `branchColor-${branchRoot.id}`;
+
+        const input = document.createElement('input');
+        input.id = inputId;
+        input.type = 'color';
+        input.value = branchRoot.branchColor || branchRoot.color || DEFAULT_COLOR;
+        input.addEventListener('input', event => {
+          setBranchColor(branchRoot, event.target.value);
+          renderBranchBackgrounds();
+          saveTasks();
+        });
+
+        elements.detailsBox.appendChild(input);
+      }
+    }
+
+    function appendParentList(task) {
+      const parents = getParents(task);
+
+      if (!parents.length) {
+        return;
+      }
+
+      const list = document.createElement('div');
+      list.className = 'parent-list';
+
+      for (const parent of parents) {
+        const chip = document.createElement('div');
+        chip.className = 'parent-chip';
+
+        const label = document.createElement('span');
+        label.textContent = parent.title;
+
+        const removeButton = document.createElement('button');
+        removeButton.textContent = 'usuń';
+        removeButton.addEventListener('click', () => removeParent(task.id, parent.id));
+
+        chip.appendChild(label);
+        chip.appendChild(removeButton);
+        list.appendChild(chip);
+      }
+
+      elements.detailsBox.appendChild(list);
+    }
+
+    function appendTaskEditFields(task) {
+      elements.detailsBox.appendChild(createLabel('editTitle', 'Nazwa'));
+      const titleInput = document.createElement('input');
+      titleInput.id = 'editTitle';
+      titleInput.value = task.title;
+      elements.detailsBox.appendChild(titleInput);
+
+      elements.detailsBox.appendChild(createLabel('editDesc', 'Opis'));
+      const descriptionInput = document.createElement('textarea');
+      descriptionInput.id = 'editDesc';
+      descriptionInput.value = task.desc || '';
+      elements.detailsBox.appendChild(descriptionInput);
+
+      elements.detailsBox.appendChild(createLabel('editParent', 'Ustaw jako jedyny poprzedni etap'));
+      const parentSelect = document.createElement('select');
+      parentSelect.id = 'editParent';
+      fillParentSelect(parentSelect, getParents(task)[0]?.id || '', getExcludedParentIds(task));
+      elements.detailsBox.appendChild(parentSelect);
+
+      elements.detailsBox.appendChild(createLabel('editColor', 'Kolor'));
+      const colorInput = document.createElement('input');
+      colorInput.id = 'editColor';
+      colorInput.type = 'color';
+      colorInput.value = task.color || DEFAULT_COLOR;
+      colorInput.addEventListener('input', event => previewSelectedColor(event.target.value));
+      elements.detailsBox.appendChild(colorInput);
+    }
+
+    function appendTaskActions(task) {
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      const saveButton = document.createElement('button');
+      saveButton.className = 'primary';
+      saveButton.textContent = 'Zapisz';
+      saveButton.addEventListener('click', saveSelectedEdit);
+      actions.appendChild(saveButton);
+
+      if (!isStartTask(task)) {
+        const toggleButton = document.createElement('button');
+        toggleButton.className = 'ghost';
+        toggleButton.textContent = task.done ? 'Cofnij ukończenie' : 'Odhacz jako ukończone';
+        toggleButton.addEventListener('click', () => toggleTask(task.id));
+        actions.appendChild(toggleButton);
+      }
+
+      const deleteButton = document.createElement('button');
+      deleteButton.className = 'danger';
+      deleteButton.textContent = 'Usuń';
+      deleteButton.addEventListener('click', deleteSelected);
+      actions.appendChild(deleteButton);
+
+      elements.detailsBox.appendChild(actions);
+    }
+
+    function createLabel(forId, text) {
+      const label = document.createElement('label');
+      label.htmlFor = forId;
+      label.textContent = text;
+      return label;
+    }
+
+    function fillParentSelect(select, selectedValue, excludedIds) {
+      select.innerHTML = '';
+
+      const emptyOption = document.createElement('option');
+      emptyOption.value = '';
+      emptyOption.textContent = 'Brak';
+      select.appendChild(emptyOption);
+
+      for (const task of appState.tasks) {
+        if (excludedIds.has(task.id)) {
+          continue;
+        }
+
+        const option = document.createElement('option');
+        option.value = task.id;
+        option.textContent = task.title;
+        select.appendChild(option);
+      }
+
+      if ([...select.options].some(option => option.value === selectedValue)) {
+        select.value = selectedValue;
+      }
+    }
+
+    function getExcludedParentIds(task) {
+      const excludedIds = getDescendantIds(task.id);
+      excludedIds.add(task.id);
+      return excludedIds;
+    }
+
+    function getDescendantIds(parentId, visitedIds = new Set()) {
+      const result = new Set();
+
+      for (const child of getChildren(parentId)) {
+        if (visitedIds.has(child.id)) {
+          continue;
+        }
+
+        visitedIds.add(child.id);
+        result.add(child.id);
+
+        for (const nestedId of getDescendantIds(child.id, visitedIds)) {
+          result.add(nestedId);
+        }
+      }
+
+      return result;
+    }
+
+    // =====================================================
+    // 9. Modyfikacja zadań
+    // =====================================================
+
+    function addTask() {
+      const title = elements.taskTitle.value.trim();
+      const desc = elements.taskDesc.value.trim();
+      const color = elements.taskColor.value || DEFAULT_COLOR;
+
+      if (!title) {
+        showToast('Podaj nazwę etapu.');
+        return;
+      }
+
+      const newTaskId = crypto.randomUUID ? crypto.randomUUID() : `task-${Date.now()}`;
+      const unconnectedTasksCount = appState.tasks.filter(task => !isStartTask(task) && !(task.parentIds || []).length).length;
+
+      const x = 120;
+      const y = 120 + unconnectedTasksCount * 170;
+
+      ensureCanvasForRect(x, y, NODE.normalWidth, NODE.normalEstimatedHeight);
+
+      appState.tasks.push({
+        id: newTaskId,
+        isStart: false,
+        title,
+        desc,
+        parentIds: [],
+        done: false,
+        color,
+        branchColor: null,
+        x: clamp(x, 20, appState.canvasWidth - NODE.normalWidth - 20),
+        y: clamp(y, 20, appState.canvasHeight - NODE.normalEstimatedHeight)
+      });
+
+      elements.taskTitle.value = '';
+      elements.taskDesc.value = '';
+      elements.taskColor.value = DEFAULT_COLOR;
+      appState.selectedTaskId = newTaskId;
+
+      showToast('Dodano nowy kafelek. Połącz go z innymi w trybie łączenia.');
+      render();
+    }
+
+    function saveSelectedEdit() {
+      const task = findTaskById(appState.selectedTaskId);
+
+      if (!task) {
+        return;
+      }
+
+      const title = document.getElementById('editTitle').value.trim();
+      const desc = document.getElementById('editDesc').value.trim();
+      const parentId = document.getElementById('editParent').value || null;
+      const color = document.getElementById('editColor').value || DEFAULT_COLOR;
+
+      if (!title) {
+        showToast('Nazwa etapu nie może być pusta.');
+        return;
+      }
+
+      if (parentId && getDescendantIds(task.id).has(parentId)) {
+        showToast('Nie można ustawić zależności do własnego potomka.');
+        return;
+      }
+
+      task.title = title;
+      task.desc = desc;
+      task.parentIds = parentId ? [parentId] : [];
+      task.color = color;
+
+      if (isStartTask(task)) {
+        task.done = false;
+      }
+
+      if (isLocked(task) && task.done) {
+        task.done = false;
+      }
+
+      showToast('Zapisano zmiany etapu.');
+      render();
+    }
+
+    function toggleTask(taskId) {
+      const task = findTaskById(taskId);
+
+      if (!task) return;
+
+      appState.selectedTaskId = task.id;
+
+      if (isStartTask(task)) {
+        showToast('Start procesu jest zawsze aktywny.');
+        return;
+      }
+
+      if (isLocked(task)) {
+        showToast('Ten etap jest zablokowany. Najpierw ukończ wszystkie poprzednie kroki.');
+        return;
+      }
+
+      task.done = !task.done;
+
+      if (!task.done) {
+        uncompleteChildren(task.id);
+      }
+
+      render();
+    }
+
+    function uncompleteChildren(parentId) {
+      for (const child of getChildren(parentId)) {
+        child.done = false;
+        uncompleteChildren(child.id);
+      }
+    }
+
+    function removeParent(taskId, parentId) {
+      const task = findTaskById(taskId);
+
+      if (!task) return;
+
+      task.parentIds = (task.parentIds || []).filter(id => id !== parentId);
+
+      if (isLocked(task)) {
+        task.done = false;
+      }
+
+      appState.selectedTaskId = task.id;
+      render();
+    }
+
+    function deleteSelected() {
+      const task = findTaskById(appState.selectedTaskId);
+
+      if (!task) return;
+
+      const hasChildren = appState.tasks.some(candidate => (candidate.parentIds || []).includes(task.id));
+
+      if (hasChildren && !confirm('Ten etap ma kolejne zależne kroki. Usunąć razem z nimi?')) {
+        return;
+      }
+
+      const idsToDelete = new Set();
+      collectChildren(task.id, idsToDelete);
+
+      appState.tasks = appState.tasks.filter(candidate => !idsToDelete.has(candidate.id));
+
+      for (const candidate of appState.tasks) {
+        candidate.parentIds = (candidate.parentIds || []).filter(parentId => !idsToDelete.has(parentId));
+      }
+
+      appState.selectedTaskId = null;
+      showToast('Usunięto etap.');
+      render();
+    }
+
+    function collectChildren(taskId, idsToDelete) {
+      idsToDelete.add(taskId);
+
+      for (const child of getChildren(taskId)) {
+        collectChildren(child.id, idsToDelete);
+      }
+    }
+
+    function previewSelectedColor(color) {
+      const node = [...document.querySelectorAll('.node')]
+        .find(candidate => candidate.dataset.id === appState.selectedTaskId);
+
+      if (node) {
+        node.style.setProperty('--node-color', color);
+      }
+    }
+
+    // =====================================================
+    // 10. Tryb łączenia kafelków
+    // =====================================================
+
+    function updateLinkModeButton() {
+      elements.linkModeBtn.textContent = appState.linkMode ? 'Łączenie: wł.' : 'Łączenie: wył.';
+      elements.linkModeBtn.classList.toggle('active', appState.linkMode);
+    }
+
+    function toggleLinkMode() {
+      appState.linkMode = !appState.linkMode;
+      clearDraftLink();
+      updateLinkModeButton();
+      showToast(appState.linkMode
+        ? 'Tryb łączenia: przeciągnij linię od kafelka źródłowego do docelowego.'
+        : 'Tryb łączenia wyłączony.'
+      );
+    }
+
+    function startLinkDrag(event, node, task) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      appState.selectedTaskId = task.id;
+      appState.activeLink = {
+        sourceId: task.id,
+        startX: task.x + getNodeWidth(task),
+        startY: task.y + getNodeCenterY(task)
+      };
+
+      node.classList.add('link-source', 'selected');
+      drawDraftLink(appState.activeLink.startX + 120, appState.activeLink.startY);
+      renderDetails();
+    }
+
+    function drawDraftLink(toX, toY) {
+      if (!appState.activeLink) {
+        return;
+      }
+
+      elements.linkDraft.innerHTML = '';
+
+      const mid = (appState.activeLink.startX + toX) / 2;
+      const path = createSvgElement('path');
+      path.setAttribute('class', 'draft-link-path');
+      path.setAttribute('d', `M ${appState.activeLink.startX} ${appState.activeLink.startY} C ${mid} ${appState.activeLink.startY}, ${mid} ${toY}, ${toX} ${toY}`);
+
+      elements.linkDraft.appendChild(path);
+    }
+
+    function clearDraftLink() {
+      elements.linkDraft.innerHTML = '';
+      document.querySelectorAll('.node.link-source').forEach(node => node.classList.remove('link-source'));
+      appState.activeLink = null;
+    }
+
+    function connectTasks(sourceId, targetId) {
+      const source = findTaskById(sourceId);
+      const target = findTaskById(targetId);
+
+      if (!source || !target) {
+        showToast('Nie udało się połączyć kafelków.');
+        return;
+      }
+
+      if (source.id === target.id) {
+        showToast('Nie można połączyć kafelka z samym sobą.');
+        return;
+      }
+
+      if (isStartTask(target)) {
+        showToast('Start procesu nie może mieć poprzedniego etapu.');
+        return;
+      }
+
+      if ((target.parentIds || []).includes(source.id)) {
+        showToast('To połączenie już istnieje.');
+        return;
+      }
+
+      if (hasAncestor(source.id, target.id)) {
+        showToast('Takie połączenie utworzyłoby pętlę.');
+        return;
+      }
+
+      target.parentIds = [...(target.parentIds || []), source.id];
+
+      if (isLocked(target)) {
+        target.done = false;
+      }
+
+      appState.selectedTaskId = target.id;
+      showToast(`Dodano zależność: "${source.title}" → "${target.title}".`);
+      render();
+    }
+
+    function hasAncestor(taskId, ancestorId, visitedIds = new Set()) {
+      if (visitedIds.has(taskId)) {
+        return false;
+      }
+
+      visitedIds.add(taskId);
+      const task = findTaskById(taskId);
+
+      if (!task) {
+        return false;
+      }
+
+      for (const parentId of task.parentIds || []) {
+        if (parentId === ancestorId) {
+          return true;
+        }
+
+        if (hasAncestor(parentId, ancestorId, visitedIds)) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    // =====================================================
+    // 11. Drag & drop kafelków
+    // =====================================================
+
+    function handleNodePointerDown(event) {
+      if (event.target.closest('button')) {
+        return;
+      }
+
+      const node = event.currentTarget;
+      const task = findTaskById(node.dataset.id);
+
+      if (!task) {
+        return;
+      }
+
+      if (appState.linkMode) {
+        startLinkDrag(event, node, task);
+      } else {
+        startNodeDrag(event, node, task);
+      }
+    }
+
+    function startNodeDrag(event, node, task) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      node.setPointerCapture(event.pointerId);
+      appState.selectedTaskId = task.id;
+      appState.activeDrag = {
+        pointerId: event.pointerId,
+        node,
+        task,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startX: task.x,
+        startY: task.y
+      };
+
+      node.classList.add('dragging', 'selected');
+      renderDetails();
+    }
+
+    function handlePointerMove(event) {
+      if (appState.activeLink) {
+        const point = clientToCanvas(event.clientX, event.clientY);
+        drawDraftLink(point.x, point.y);
+        return;
+      }
+
+      if (!appState.activeDrag) {
+        return;
+      }
+
+      const drag = appState.activeDrag;
+      const deltaX = (event.clientX - drag.startClientX) / appState.zoom;
+      const deltaY = (event.clientY - drag.startClientY) / appState.zoom;
+
+      const proposedX = Math.max(20, drag.startX + deltaX);
+      const proposedY = Math.max(20, drag.startY + deltaY);
+
+      ensureCanvasForRect(proposedX, proposedY, getNodeWidth(drag.task), getNodeEstimatedHeight(drag.task));
+
+      drag.task.x = clamp(proposedX, 20, appState.canvasWidth - getNodeWidth(drag.task) - 20);
+      drag.task.y = clamp(proposedY, 20, appState.canvasHeight - getNodeEstimatedHeight(drag.task));
+
+      drag.node.style.left = `${drag.task.x}px`;
+      drag.node.style.top = `${drag.task.y}px`;
+
+      renderLinks();
+      renderBranchBackgrounds();
+    }
+
+    function handlePointerUp(event) {
+      if (appState.activeLink) {
+        finishLinkDrag(event);
+        return;
+      }
+
+      if (!appState.activeDrag) {
+        return;
+      }
+
+      try {
+        appState.activeDrag.node.releasePointerCapture(appState.activeDrag.pointerId);
+      } catch {
+        // Ignorujemy sytuację, gdy przeglądarka zwolniła pointer capture wcześniej.
+      }
+
+      appState.activeDrag.node.classList.remove('dragging');
+      appState.activeDrag = null;
+      saveTasks();
+      render();
+    }
+
+    function finishLinkDrag(event) {
+      const elementUnderCursor = document.elementFromPoint(event.clientX, event.clientY);
+      const targetNode = elementUnderCursor ? elementUnderCursor.closest('.node') : null;
+      const sourceId = appState.activeLink.sourceId;
+
+      clearDraftLink();
+
+      if (targetNode) {
+        connectTasks(sourceId, targetNode.dataset.id);
+      } else {
+        showToast('Upuść linię na kafelku, aby utworzyć połączenie.');
+      }
+    }
+
+    // =====================================================
+    // 12. Pan canvasu, import/export, reset, toast
+    // =====================================================
+
+    function startCanvasPan(event) {
+      if (event.target.closest('.node')) {
+        return;
+      }
+
+      hideDetails();
+      panState.isPanning = true;
+      panState.startX = event.pageX - elements.workspace.offsetLeft;
+      panState.startY = event.pageY - elements.workspace.offsetTop;
+      panState.scrollLeft = elements.workspace.scrollLeft;
+      panState.scrollTop = elements.workspace.scrollTop;
+      elements.workspace.style.cursor = 'grabbing';
+    }
+
+    function moveCanvasPan(event) {
+      if (!panState.isPanning || appState.activeDrag) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const x = event.pageX - elements.workspace.offsetLeft;
+      const y = event.pageY - elements.workspace.offsetTop;
+
+      elements.workspace.scrollLeft = panState.scrollLeft - (x - panState.startX);
+      elements.workspace.scrollTop = panState.scrollTop - (y - panState.startY);
+    }
+
+    function stopCanvasPan() {
+      panState.isPanning = false;
+      elements.workspace.style.cursor = 'default';
+    }
+
+    function exportJson() {
+      const blob = new Blob([JSON.stringify(appState.tasks, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download = 'workflow-skill-tree.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importJson(event) {
+      const file = event.target.files[0];
+
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          appState.tasks = normalizeTasks(JSON.parse(reader.result));
+          appState.selectedTaskId = null;
+
+          for (const task of appState.tasks) {
+            ensureCanvasForRect(task.x, task.y, getNodeWidth(task), getNodeEstimatedHeight(task));
+          }
+
+          showToast('Zaimportowano drzewko.');
+          render();
+        } catch {
+          showToast('Nie udało się zaimportować pliku JSON.');
+        }
+      };
+
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function resetDemo() {
+      if (!confirm('Przywrócić przykładowe drzewko? Obecne dane zostaną nadpisane.')) {
+        return;
+      }
+
+      appState.canvasWidth = CANVAS.initialWidth;
+      appState.canvasHeight = CANVAS.initialHeight;
+      appState.tasks = getDemoTasks();
+      appState.selectedTaskId = null;
+      localStorage.removeItem(STORAGE_KEY);
+      render();
+    }
+
+    function showToast(message) {
+      elements.toast.textContent = message;
+      elements.toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => elements.toast.classList.remove('show'), 2000);
+    }
+
+    function hideDetails() {
+      appState.selectedTaskId = null;
+      render();
+    }
+
+    // =====================================================
+    // 13. Event listenery i start aplikacji
+    // =====================================================
+
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+
+    elements.workspace.addEventListener('wheel', event => {
+      event.preventDefault();
+      const direction = event.deltaY > 0 ? -1 : 1;
+      applyZoom(appState.zoom + direction * ZOOM.step, event.clientX, event.clientY);
+    }, { passive: false });
+
+    elements.workspace.addEventListener('mousedown', startCanvasPan);
+    elements.workspace.addEventListener('mousemove', moveCanvasPan);
+    elements.workspace.addEventListener('mouseup', stopCanvasPan);
+    elements.workspace.addEventListener('mouseleave', stopCanvasPan);
+
+    document.getElementById('addTaskBtn').addEventListener('click', addTask);
+    document.getElementById('exportBtn').addEventListener('click', exportJson);
+    document.getElementById('importBtn').addEventListener('click', () => elements.importFile.click());
+    elements.importFile.addEventListener('change', importJson);
+    document.getElementById('resetBtn').addEventListener('click', resetDemo);
+    document.getElementById('resetZoomBtn').addEventListener('click', resetZoom);
+    elements.linkModeBtn.addEventListener('click', toggleLinkMode);
+
+    appState.tasks = loadTasks();
+    resetZoom();
+    updateLinkModeButton();
+    render();
+
+    elements.workspace.scrollLeft = 0;
+    elements.workspace.scrollTop = 60;
+  </script>
+</body>
+</html>

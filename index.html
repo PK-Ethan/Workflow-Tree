@@ -611,6 +611,12 @@
             <label for="taskColor">Kolor</label>
             <input id="taskColor" type="color" value="#2563eb" />
           </div>
+		  <div>
+			<label style="display:flex; align-items:center; justify-content:space-between; gap:6px; white-space:nowrap;">
+			<span>Kafelek startowy?</span>
+			<input id="taskIsStart" type="checkbox" />
+			</label>
+		  </div>
         </div>
 
         <label for="taskDesc">Opis</label>
@@ -1470,12 +1476,15 @@
       descriptionInput.id = 'editDesc';
       descriptionInput.value = task.desc || '';
       elements.detailsBox.appendChild(descriptionInput);
-
-      elements.detailsBox.appendChild(createLabel('editParent', 'Ustaw jako jedyny poprzedni etap'));
-      const parentSelect = document.createElement('select');
-      parentSelect.id = 'editParent';
-      fillParentSelect(parentSelect, getParents(task)[0]?.id || '', getExcludedParentIds(task));
-      elements.detailsBox.appendChild(parentSelect);
+	  
+	  const wrapper = document.createElement('div');
+	  wrapper.innerHTML = `
+		<label style="display:flex; align-items:center; justify-content:space-between; gap:6px; white-space:nowrap;">
+		<span>Kafelek startowy</span>
+		<input id="editIsStart" type="checkbox" ${task.isStart ? 'checked' : ''} />
+		</label>
+	  `;
+	  elements.detailsBox.appendChild(wrapper);
 
       elements.detailsBox.appendChild(createLabel('editColor', 'Kolor'));
       const colorInput = document.createElement('input');
@@ -1577,6 +1586,7 @@
       const title = elements.taskTitle.value.trim();
       const desc = elements.taskDesc.value.trim();
       const color = elements.taskColor.value || DEFAULT_COLOR;
+	  const isStart = document.getElementById('taskIsStart')?.checked || false;
 
       if (!title) {
         showToast('Podaj nazwę etapu.');
@@ -1593,7 +1603,7 @@
 
       appState.tasks.push({
         id: newTaskId,
-        isStart: false,
+        isStart: isStart,
         title,
         desc,
         parentIds: [],
@@ -1607,6 +1617,7 @@
       elements.taskTitle.value = '';
       elements.taskDesc.value = '';
       elements.taskColor.value = DEFAULT_COLOR;
+	  document.getElementById('taskIsStart').checked = false;
       appState.selectedTaskId = newTaskId;
 
       showToast('Dodano nowy kafelek. Połącz go z innymi w trybie łączenia.');
@@ -1615,29 +1626,25 @@
 
     function saveSelectedEdit() {
       const task = findTaskById(appState.selectedTaskId);
-
-      if (!task) {
-        return;
-      }
+	  
+	  if (!task) {
+		return;
+	  }
 
       const title = document.getElementById('editTitle').value.trim();
       const desc = document.getElementById('editDesc').value.trim();
-      const parentId = document.getElementById('editParent').value || null;
       const color = document.getElementById('editColor').value || DEFAULT_COLOR;
+	  const isStart = document.getElementById('editIsStart')?.checked || false;
 
       if (!title) {
         showToast('Nazwa etapu nie może być pusta.');
         return;
       }
 
-      if (parentId && getDescendantIds(task.id).has(parentId)) {
-        showToast('Nie można ustawić zależności do własnego potomka.');
-        return;
-      }
-
-      task.title = title;
+	  const wasStart = task.isStart;
+	  
+	  task.title = title;
       task.desc = desc;
-      task.parentIds = parentId ? [parentId] : [];
       task.color = color;
 
       if (isStartTask(task)) {
@@ -1647,6 +1654,22 @@
       if (isLocked(task) && task.done) {
         task.done = false;
       }
+	  
+	  if (isStart && !wasStart) {
+	    for (const t of appState.tasks) {
+		  t.parentIds = (t.parentIds || []).filter(id => id !== task.id);
+	    }
+
+	    task.parentIds = [];
+
+	    showToast('Kafelek został ustawiony jako startowy. Połączenia usunięte.');
+	  }
+
+	  if (!isStart && wasStart) {
+	    task.done = false;
+	  }
+
+	  task.isStart = isStart;
 
       showToast('Zapisano zmiany etapu.');
       render();
@@ -1765,6 +1788,9 @@
       event.preventDefault();
       event.stopPropagation();
 
+	  document.querySelectorAll('.node.link-source').forEach(n => n.classList.remove('link-source'));
+	  document.querySelectorAll('.node.selected').forEach(n => n.classList.remove('selected'));
+
       appState.selectedTaskId = task.id;
       appState.activeLink = {
         sourceId: task.id,
@@ -1795,6 +1821,7 @@
     function clearDraftLink() {
       elements.linkDraft.innerHTML = '';
       document.querySelectorAll('.node.link-source').forEach(node => node.classList.remove('link-source'));
+	  document.querySelectorAll('.node.selected').forEach(node => node.classList.remove('selected'));
       appState.activeLink = null;
     }
 

@@ -125,6 +125,53 @@
       color: #111827;
       font-weight: 800;
     }
+	
+	#globalStatsBar {
+	  display: flex;
+	  gap: 8px;
+	  align-items: center;
+	}
+
+	.header-stat {
+	  padding: 4px 12px;
+	  border-radius: 12px;
+	  background: rgba(90, 90, 90, 0.1);
+	  border: 2px solid rgba(148, 163, 184, 0.2);
+	  font-size: 12px;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	  min-width: 50px;
+	}
+
+	.header-stat strong {
+	  font-size: 16px;
+	}
+
+	.header-stat span {
+	  font-size: 12px;
+	  color: #cbd5e1;
+	}
+	
+	.stat-all {
+	  border-color: rgba(135, 74, 210, 0.75);
+	}
+	
+	.stat-done {
+	  border-color: rgba(140, 180, 60, 0.85);
+	}
+
+	.stat-ready {
+	  border-color: rgba(255, 162, 25, 0.85);
+	}
+
+	.stat-locked {
+	  border-color: rgba(90, 90, 90, 0.95);
+	}
+
+	.stat-percent {
+	  border-color: rgba(11, 126, 134, 0.75);
+	}
 
     /* =====================================================
        3. Layout i panel boczny
@@ -132,7 +179,7 @@
 
     main {
       display: grid;
-      grid-template-columns: 250px 1fr;
+      grid-template-columns: 220px 1fr 150px;
       height: calc(100vh - 64px);
     }
 
@@ -265,6 +312,7 @@
       overscroll-behavior: contain;
       background-image: radial-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px);
       background-size: 32px 32px;
+	  touch-action: none;
     }
 
     #canvasSizer {
@@ -574,8 +622,10 @@
   <header>
     <div>
       <h1>Workflow Skill Tree</h1>
-      <p>Drzewko etapów z wieloma zależnościami, tłem gałęzi i łączeniem kafelków myszką</p>
+      <p>v 1.2</p>
     </div>
+
+	<div id="globalStatsBar"></div>
 
     <div class="toolbar">
       <span class="zoom-badge" id="zoomBadge">100%</span>
@@ -590,15 +640,7 @@
 
   <main>
     <aside>
-      <section class="card">
-        <h2>Postęp globalny</h2>
-        <div class="stats">
-          <div class="stat"><strong id="doneCount">0</strong><span>ukończone</span></div>
-          <div class="stat"><strong id="readyCount">0</strong><span>dostępne</span></div>
-          <div class="stat"><strong id="lockedCount">0</strong><span>zablokowane</span></div>
-          <div class="stat"><strong id="percentDone">0%</strong><span>całości</span></div>
-        </div>
-      </section>
+      
 
       <section class="card">
         <h2>Dodaj etap</h2>
@@ -641,6 +683,12 @@
         </div>
       </div>
     </section>
+	
+	<aside id="rightPanel">
+	  <section class="card">
+		<div id="startSummary"></div>
+	  </section>
+	</aside>
   </main>
 
   <div class="toast" id="toast"></div>
@@ -692,6 +740,8 @@
 
     const elements = {
       workspace: document.getElementById('workspace'),
+	  startSummary: document.getElementById('startSummary'),
+	  globalStatsBar: document.getElementById('globalStatsBar'),
       canvasSizer: document.getElementById('canvasSizer'),
       canvas: document.getElementById('canvas'),
       branchBackgrounds: document.getElementById('branchBackgrounds'),
@@ -715,6 +765,12 @@
       scrollLeft: 0,
       scrollTop: 0
     };
+	
+	let touchZoom = {
+	  active: false,
+	  startDistance: 0,
+	  startZoom: 1
+	};
 
     // =====================================================
     // 3. Dane demo i normalizacja
@@ -768,7 +824,7 @@
           id: 'tests',
           title: 'Testy',
           desc: 'Sprawdzenie scenariuszy pozytywnych i negatywnych.',
-          parentIds: ['config'],
+          parentIds: ['config', 'training'],
           done: false,
           color: '#ef4444',
           x: 1300,
@@ -792,16 +848,6 @@
           done: false,
           color: '#84cc16',
           x: 1010,
-          y: 400
-        },
-        {
-          id: 'golive',
-          title: 'Go-live',
-          desc: 'Uruchomienie procesu i monitoring pierwszych przypadków.',
-          parentIds: ['tests'],
-          done: false,
-          color: '#22c55e',
-          x: 1300,
           y: 400
         }
       ];
@@ -924,6 +970,12 @@
       const rgb = hexToRgb(hex);
       return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
     }
+	
+	function getTouchDistance(touches) {
+	  const dx = touches[0].clientX - touches[1].clientX;
+	  const dy = touches[0].clientY - touches[1].clientY;
+	  return Math.sqrt(dx * dx + dy * dy);
+	}
 
     // =====================================================
     // 5. Logika zależności i gałęzi
@@ -1156,9 +1208,10 @@
       renderNodes();
       renderBranchBackgrounds();
       renderLinks();
-      renderStats();
       renderDetails();
       saveTasks();
+	  renderStartSummary();
+	  renderGlobalStatsBar();
     }
 
     function renderNodes() {
@@ -1345,19 +1398,85 @@
 
       return path;
     }
+	
+	function renderGlobalStatsBar() {
+	  const relevantTasks = appState.tasks.filter(task => !isStartTask(task));
 
-    function renderStats() {
-      const relevantTasks = appState.tasks.filter(task => !isStartTask(task));
-      const total = relevantTasks.length || 1;
-      const done = relevantTasks.filter(task => task.done).length;
-      const ready = relevantTasks.filter(task => isReady(task)).length;
-      const locked = relevantTasks.filter(task => isLocked(task)).length;
+	  const total = relevantTasks.length || 1;
+	  const done = relevantTasks.filter(t => t.done).length;
+	  const ready = relevantTasks.filter(t => isReady(t)).length;
+	  const locked = relevantTasks.filter(t => isLocked(t)).length;
 
-      document.getElementById('doneCount').textContent = done;
-      document.getElementById('readyCount').textContent = ready;
-      document.getElementById('lockedCount').textContent = locked;
-      document.getElementById('percentDone').textContent = `${Math.round((done / total) * 100)}%`;
-    }
+	  const percent = Math.round((done / total) * 100);
+
+	  elements.globalStatsBar.innerHTML = `
+		<div class="header-stat stat-done">
+		  <strong>${done}</strong>
+		  <span>Wykonane</span>
+		</div>
+
+		<div class="header-stat stat-ready">
+		  <strong>${ready}</strong>
+		  <span>Dostępne</span>
+		</div>
+
+		<div class="header-stat stat-locked">
+		  <strong>${locked}</strong>
+		  <span>Zablokowane</span>
+		</div>
+
+		<div class="header-stat stat-percent">
+		  <strong>${percent}%</strong>
+		  <span>Łączny progres</span>
+		</div>
+		
+		<div class="header-stat stat-all">
+		  <strong>${total}</strong>
+		  <span>Wszystkie</span>
+		</div>
+	  `;
+	}
+	
+	function renderStartSummary() {
+	  elements.startSummary.innerHTML = '';
+	  const startTasks = appState.tasks.filter(t => isStartTask(t));
+	  for (const start of startTasks) {
+		const progress = getTreeProgress(start.id);
+		const box = document.createElement('div');
+		const color = start.color || '#2563eb';
+		box.className = 'card';
+		box.style.background = `
+		  linear-gradient(
+		  135deg,
+		  ${rgbaFromHex(color, 0.25)},
+		  rgba(15, 23, 42, 0.9)
+		  )
+	    `;
+		box.style.border = `1px solid ${rgbaFromHex(color, 0.4)}`;
+		``
+		box.className = 'card';
+		box.innerHTML = `
+		  <div style="font-weight:600; margin-bottom:6px;">
+			${start.title}
+		  </div>
+
+		  <div style="font-size:14px; font-weight:700;">
+			${progress.percent}%
+		  </div>
+
+		  <div style="margin-top:6px; height:6px; border-radius:999px; background: rgba(148,163,184,0.2); overflow:hidden;">
+		    <div style="height:100%; width:${progress.percent}%; background: linear-gradient(90deg,#2563eb,#22c55e);"></div>
+		  </div>
+
+		  <div style="font-size:11px; margin-top:6px; color:#cbd5e1;">
+			Ukończone: ${progress.done}/${progress.total}
+			Dostępne: ${progress.ready}
+			Zablokowane: ${progress.locked}
+		  </div>
+		`;
+		elements.startSummary.appendChild(box);
+	  }
+	}
 
     // =====================================================
     // 8. Panel szczegółów
@@ -2133,6 +2252,33 @@
 
     elements.workspace.scrollLeft = 0;
     elements.workspace.scrollTop = 60;
+	
+	elements.workspace.addEventListener('touchstart', event => {
+	  if (event.touches.length === 2) {
+		touchZoom.active = true;
+		touchZoom.startDistance = getTouchDistance(event.touches);
+		touchZoom.startZoom = appState.zoom;
+	  }
+	}, { passive: false });
+	
+	elements.workspace.addEventListener('touchmove', event => {
+	  if (touchZoom.active && event.touches.length === 2) {
+		event.preventDefault();
+
+		const newDistance = getTouchDistance(event.touches);
+		const scale = newDistance / touchZoom.startDistance;
+		const newZoom = touchZoom.startZoom * scale * 0.95;
+		const centerX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+		const centerY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+
+		applyZoom(newZoom, centerX, centerY);
+	  }
+	}, { passive: false });
+	
+	elements.workspace.addEventListener('touchend', () => {
+	  touchZoom.active = false;
+	});
+	
   </script>
 </body>
 </html>
